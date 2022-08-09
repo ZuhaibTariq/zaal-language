@@ -4,24 +4,21 @@
 #include <string.h>
 #include "source.c"
 
-typedef enum TokenType TokenType;
-typedef struct Token Token;
-// typedef struct TokenList TokenList;
 #define MIN_LIST_VALUE 500
 
-enum TokenType {
+typedef enum{
 
   // Single-character tokens.
   LEFT_PAREN, RIGHT_PAREN, LEFT_BRACE, RIGHT_BRACE,
-  COMMA, DOT, SEMICOLON,
+  COMMA, DOT, SEMICOLON, MODULO,
 
   // One or two character tokens.
   NOT, NOT_EQUAL,
   EQUAL, EQUAL_EQUAL,
   GREATER, GREATER_EQUAL,
   LESS, LESS_EQUAL,
-  PLUS, PLUS_PLUS,
-  MINUS, MINUS_MINUS,
+  PLUS, PLUS_PLUS, PLUS_EQUAL,
+  MINUS, MINUS_MINUS, MINUS_EQUAL,
   STAR, STAR_EQUAL,
   SLASH, SLASH_EQUAL,
 
@@ -32,20 +29,21 @@ enum TokenType {
   AND, CLASS, ELSE, FALSE, FUN, FOR, IF, NONE, OR,
   PRINT, RETURN, SUPER, THIS, TRUE, VAR, WHILE, IMPORT,
 
-  EOFI
-};
+  EOFI, EMPTY_TOK, BAD_TOK
+}TokenType;
 
-struct Token{
-    enum TokenType type;
+typedef struct{
+    TokenType type;
     int s_offset;
     int e_offset;
-};
+}Token;
 
-typedef struct TokensList{
+typedef struct{
     int size;
     Token* arr;
+    int current;
 
-}TokenList;
+}TokensList;
 
 
 Token new_token(TokenType type, int start, int end)
@@ -75,6 +73,19 @@ bool next_if(Source* source, char expected)
     else return false;
 }
 
+Token slash_tokens(Source* source, int start)
+{
+    if (next_if(source, '=')) return new_token(SLASH_EQUAL, start, source->current);
+
+    else if (next_if(source, '/')){
+        
+        //since it's a comment, eat charaters till '\n' or '\0'
+        for(char ch = next(source); ch != '\n' && ch != '\0'; ch=next(source));
+        return new_token(EMPTY_TOK, start, source->current);
+    }
+    else return new_token(SLASH, start, source->current);
+}
+
 Token scan_next_token(Source* source)
 {
     int start = source->current;
@@ -87,14 +98,29 @@ Token scan_next_token(Source* source)
 
     case '(': return new_token(LEFT_PAREN, start, end); break;
     case ')': return new_token(RIGHT_PAREN, start, end); break;
-    case '{': return new_token(RIGHT_BRACE, start, end); break;
-    case '}': return new_token(LEFT_BRACE, start, end); break;
+    case '{': return new_token(LEFT_BRACE, start, end); break;
+    case '}': return new_token(RIGHT_BRACE, start, end); break;
     case ',': return new_token(COMMA, start, end); break;
     case '.': return new_token(DOT, start, end); break;
     case ';': return new_token(SEMICOLON, start, end); break;
+    case '%': return new_token(MODULO, start, end); break;
 
     case '!': return next_if(source, '=') ? new_token(NOT_EQUAL, start, source->current) : new_token(NOT, start, end);
     case '=': return next_if(source, '=') ? new_token(EQUAL_EQUAL, start, source->current) : new_token(EQUAL, start, end);
+    case '>': return next_if(source, '=') ? new_token(GREATER_EQUAL, start, source->current) : new_token(GREATER, start, end);
+    case '<': return next_if(source, '=') ? new_token(LESS_EQUAL, start, source->current) : new_token(LESS, start, end);
+    case '*': return next_if(source, '=') ? new_token(STAR_EQUAL, start, source->current) : new_token(STAR, start, end);
+    
+    case '+': return next_if(source, '+') ? new_token(PLUS_PLUS, start, source->current) : 
+                     next_if(source, '=') ? new_token(PLUS_EQUAL, start, source->current) : new_token(PLUS, start, end);
+    
+    case '-': return next_if(source, '-') ? new_token(MINUS_MINUS, start, source->current) : 
+                     next_if(source, '=') ? new_token(MINUS_EQUAL, start, source->current) : new_token(MINUS, start, end);
+    
+    case '/': return slash_tokens(source, start); break;
+    
+    
+    
 
     default: 
         return new_token(EOFI, start, end);
@@ -102,26 +128,33 @@ Token scan_next_token(Source* source)
     
 }
 
-bool append_token(TokenList* tokens, Token new_token)
+bool append_token(TokensList* tokens, Token new_token)
 {
+    if (tokens->current == tokens->size)
+    {
+        //Code to reallocate list once it runs out
+        //for now lets assume it never does
+    }
+    tokens->arr[tokens->current] = new_token;
+    tokens->current++;
+
     return true;
 }
 
-TokenList* scan_tokens(Source* source){
-    int current = 0;
-    TokenList* tokens = calloc(1, sizeof(TokenList));
+TokensList* scan_tokens(Source* source){
+    TokensList* tokens = malloc(sizeof(TokensList));
     tokens->size = MIN_LIST_VALUE;
     tokens->arr = (Token*) calloc(tokens->size, sizeof(Token));
+    tokens->current =0;
+    if (tokens->arr == NULL) printf("Mem Not Allocated");
 
-    while (current < source->size) {
+    while (source->current < source->size) {
         // Getting next Token
         Token new_token = scan_next_token(source);
         append_token(tokens, new_token);
 
     }
-
-    // Once offset calculation is implemented uncomment the line below
-    // create_token(EOFI, "", offset)
+    append_token(tokens, new_token(EOFI, source->current, source->current));
 
     return tokens;
 }

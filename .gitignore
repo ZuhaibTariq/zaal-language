@@ -1,6 +1,7 @@
 # Executables
 *.exe
 *.out
+*.interpreter
 
 # IDE
 *.vscode

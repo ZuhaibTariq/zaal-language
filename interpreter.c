@@ -41,8 +41,22 @@ Source* read_source_file(char* file)
 
 int run_code(Source* source)
 {
-    scan_tokens(source);
+    TokensList* tokens = scan_tokens(source);
 
+    //print tokens for now
+    //TODO: find a way to remove x array for printing
+    char x[200] = {'\0'};
+    for(int i=0; tokens->arr[i].type == EOFI; i++)
+    {
+        int start_index = tokens->arr[i].s_offset;
+        int end_index = tokens->arr[i].e_offset;
+        int size = end_index - start_index;
+        strncpy(x, source->data+start_index, size);
+        printf("\"%s\"\n", x);
+    }
+
+    //free tokens
+    free(tokens);
     // return status code
     return 0;
 }
@@ -57,14 +71,15 @@ int run_interactive(){
         //display a prompt
         printf("%s", "> ");
 
-        //read a line from stdin
-        scanf("%s", source->data);
-        
-        //scanf returns NULL when Ctrl+D (EOF) is pressed
-        if (source->data == NULL) break;
+        //read a line from stdin and store its size
+        size_t size;
+        source->size = getline(&source->data, &size, stdin);
 
-        // store line and its size in source instance
-        source->size = strlen(source->data);
+        //scanf returns NULL when Ctrl+D (EOF) is pressed
+        if (source->size == -1) break;
+        
+        //initialize source current to 0
+        source->current = 0;
         
         // run the line
         status = run_code(source);
@@ -72,7 +87,7 @@ int run_interactive(){
     }
 
     // free source from heap
-    free_source(source);
+    free(source);
 
     return status;
 
