@@ -2,62 +2,23 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "source.c"
+#include "source.h"
+#include "token.h"
+#include "utils.h"
+
 
 #define MIN_LIST_VALUE 500
+#define REALLOC_MULTIPLIER 2
 
-typedef enum{
-
-  // Single-character tokens.
-  LEFT_PAREN, RIGHT_PAREN, LEFT_BRACE, RIGHT_BRACE,
-  COMMA, DOT, SEMICOLON, MODULO,
-
-  // One or two character tokens.
-  NOT, NOT_EQUAL,
-  EQUAL, EQUAL_EQUAL,
-  GREATER, GREATER_EQUAL,
-  LESS, LESS_EQUAL,
-  PLUS, PLUS_PLUS, PLUS_EQUAL,
-  MINUS, MINUS_MINUS, MINUS_EQUAL,
-  STAR, STAR_EQUAL,
-  SLASH, SLASH_EQUAL,
-
-  // Literals.
-  IDENTIFIER, STRING, NUMBER,
-
-  // Keywords.
-  AND, CLASS, ELSE, FALSE, FUN, FOR, IF, NONE, OR,
-  PRINT, RETURN, SUPER, THIS, TRUE, VAR, WHILE, IMPORT,
-
-  EOFI, EMPTY_TOK, BAD_TOK
-}TokenType;
-
-typedef struct{
-    TokenType type;
-    int s_offset;
-    int e_offset;
-}Token;
-
-typedef struct{
-    int size;
-    Token* arr;
-    int current;
-
-}TokensList;
-
-
-Token new_token(TokenType type, int start, int end)
-{
-    Token t;
-    t.type = type;
-    t.s_offset = start;
-    t.e_offset = end;
-    return t;
-}
 
 char next(Source* source)
 {
     return (source->current >= source->size) ? '\0' : source->data[source->current++];
+}
+
+char look_next(Source* source)
+{
+    return (source->current >= source->size) ? '\0' : source->data[source->current];
 }
 
 bool next_if(Source* source, char expected)
@@ -73,67 +34,118 @@ bool next_if(Source* source, char expected)
     else return false;
 }
 
-Token slash_tokens(Source* source, int start)
+TokenType slash_token(Source* source, int start)
 {
-    if (next_if(source, '=')) return new_token(SLASH_EQUAL, start, source->current);
+    if (next_if(source, '=')) return SLASH_EQUAL;
 
     else if (next_if(source, '/')){
         
         //since it's a comment, eat charaters till '\n' or '\0'
         for(char ch = next(source); ch != '\n' && ch != '\0'; ch=next(source));
-        return new_token(EMPTY_TOK, start, source->current);
+        return NO_TOK;
     }
-    else return new_token(SLASH, start, source->current);
+    else return SLASH;
 }
 
-Token scan_next_token(Source* source)
+TokenType number_token(Source* source, int start)
+{
+    //since it's a number, eat charaters till a character except 0-9
+    for(char ch = look_next(source); ch >= '0' && ch <= '9'; ch=look_next(source)) source->current++;
+    return NUMBER;
+}
+
+TokenType string_token(Source* source, int start, char tok)
+{
+    //since it's a string, eat charaters till a " or ' whatever is in tok
+    for(char ch = next(source); ch != tok; ch=next(source)){
+        if (ch == '\0' || ch == '\n'){
+            //Generate an Error "Unterminated String"
+            char* sub_str = slice(source->data, start, source->current); // alloc-3 sub_str
+            printf("%s[ERROR] Unterminated String at ^ line\n", sub_str);
+            free(sub_str); // free-3 sub_str
+            source->current = start + 1;
+            return NO_TOK;
+        }
+    }
+    return STRING;
+}
+
+
+TokenType alphabet_token(Source* source, int start)
+{
+    // get all adjacent a-z A-Z _ 0-9 characters
+    for(char ch = look_next(source); 
+    ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch >= '0' && ch <= '9' || ch == '_'; 
+    ch=look_next(source)) source->current++;
+    char* sub_str = slice(source->data, start, source->current); // alloc-4 sub_str
+    
+    //decide whether its a keyword or a string
+    TokenType type = match_kwrd(sub_str);
+    free(sub_str); // free-4 sub_str
+    return type == NO_TOK ? STRING : type;
+}
+
+TokenType scan_next_token(Source* source)
 {
     int start = source->current;
     char* value;
     char ch = next(source);
     int end = source->current;
     switch (ch) {
-
-    case '\0': return new_token(EOFI, start, end); break;
-
-    case '(': return new_token(LEFT_PAREN, start, end); break;
-    case ')': return new_token(RIGHT_PAREN, start, end); break;
-    case '{': return new_token(LEFT_BRACE, start, end); break;
-    case '}': return new_token(RIGHT_BRACE, start, end); break;
-    case ',': return new_token(COMMA, start, end); break;
-    case '.': return new_token(DOT, start, end); break;
-    case ';': return new_token(SEMICOLON, start, end); break;
-    case '%': return new_token(MODULO, start, end); break;
-
-    case '!': return next_if(source, '=') ? new_token(NOT_EQUAL, start, source->current) : new_token(NOT, start, end);
-    case '=': return next_if(source, '=') ? new_token(EQUAL_EQUAL, start, source->current) : new_token(EQUAL, start, end);
-    case '>': return next_if(source, '=') ? new_token(GREATER_EQUAL, start, source->current) : new_token(GREATER, start, end);
-    case '<': return next_if(source, '=') ? new_token(LESS_EQUAL, start, source->current) : new_token(LESS, start, end);
-    case '*': return next_if(source, '=') ? new_token(STAR_EQUAL, start, source->current) : new_token(STAR, start, end);
+    //Single Character Tokens
+    case '\0': return EOFI;
+    case '(': return LEFT_PAREN;
+    case ')': return RIGHT_PAREN;
+    case '{': return LEFT_BRACE;
+    case '}': return RIGHT_BRACE;
+    case ',': return COMMA;
+    case '.': return DOT;
+    case ';': return SEMICOLON;
+    case '%': return MODULO;
+    //Double Characters Tokens
+    case '!': return next_if(source, '=') ? NOT_EQUAL : NOT;
+    case '=': return next_if(source, '=') ? EQUAL_EQUAL : EQUAL;
+    case '>': return next_if(source, '=') ? GREATER_EQUAL : GREATER;
+    case '<': return next_if(source, '=') ? LESS_EQUAL : LESS;
+    case '*': return next_if(source, '=') ? STAR_EQUAL : STAR;
+    //Triple Characters Tokens
+    case '+': return next_if(source, '+') ? PLUS_PLUS : next_if(source, '=') ? PLUS_EQUAL : PLUS;
     
-    case '+': return next_if(source, '+') ? new_token(PLUS_PLUS, start, source->current) : 
-                     next_if(source, '=') ? new_token(PLUS_EQUAL, start, source->current) : new_token(PLUS, start, end);
-    
-    case '-': return next_if(source, '-') ? new_token(MINUS_MINUS, start, source->current) : 
-                     next_if(source, '=') ? new_token(MINUS_EQUAL, start, source->current) : new_token(MINUS, start, end);
-    
-    case '/': return slash_tokens(source, start); break;
-    
-    
-    
-
-    default: 
-        return new_token(EOFI, start, end);
+    case '-': return next_if(source, '-') ? MINUS_MINUS : next_if(source, '=') ? MINUS_EQUAL : MINUS;
+    case '/': return slash_token(source, start);
+    //Useless Characters
+    case ' ':
+    case '\r':
+    case '\t':
+    case '\n':
+            return NO_TOK;
+    //For 0-9 Character
+    case 48 ... 57: return number_token(source, start);
+    // For Alphabet and _ Character
+    case 'a' ... 'z':
+    case 'A' ... 'Z':
+    case '_':
+            return alphabet_token(source,start);
+    // For Quoted Strings
+    case '"':
+    case '\'':
+            return string_token(source, start, ch);
+    default:
+        printf("[ERROR] Invalid Character: \"%c\"\n", ch);
+        return BAD_TOK;
     }
     
 }
 
-bool append_token(TokensList* tokens, Token new_token)
+bool push_token(TokensList* tokens, Token new_token)
 {
-    if (tokens->current == tokens->size)
+    if (tokens->current >= tokens->size)
     {
         //Code to reallocate list once it runs out
-        //for now lets assume it never does
+        tokens->arr = (Token*) realloc(tokens->arr, sizeof(tokens->arr[0]) * tokens->size * REALLOC_MULTIPLIER);
+        tokens->size *= REALLOC_MULTIPLIER;
+        printf("[DEBUG] Reallocating Tokens List Memory: %d\n", tokens->size);
+
     }
     tokens->arr[tokens->current] = new_token;
     tokens->current++;
@@ -141,20 +153,23 @@ bool append_token(TokensList* tokens, Token new_token)
     return true;
 }
 
-TokensList* scan_tokens(Source* source){
-    TokensList* tokens = malloc(sizeof(TokensList));
+TokensList* scan_tokens(Source* source, TokensList* tokens){
     tokens->size = MIN_LIST_VALUE;
-    tokens->arr = (Token*) calloc(tokens->size, sizeof(Token));
-    tokens->current =0;
-    if (tokens->arr == NULL) printf("Mem Not Allocated");
+    
+    tokens->arr = (Token*) calloc(tokens->size, sizeof(Token)); // alloc-2 tokens->arr
+    if (tokens->arr == NULL) {  printf("[ERROR] Mem Not Allocated for Tokens Array"); exit(2); }
 
-    while (source->current < source->size) {
-        // Getting next Token
-        Token new_token = scan_next_token(source);
-        append_token(tokens, new_token);
+    tokens->current = 0;
+    for (int start = 0; source->current < source->size; start = source->current) {
+        // Getting next Token Type
+        TokenType t_type = scan_next_token(source);
+        if (t_type != NO_TOK && t_type != BAD_TOK)
+        {
+            push_token(tokens, new_token(t_type, source->data, start, source->current)); // alloc Token.value
+        } 
 
     }
-    append_token(tokens, new_token(EOFI, source->current, source->current));
+    push_token(tokens, new_token(EOFI, source->data, source->current, source->current)); // alloc Token.value
 
     return tokens;
 }
