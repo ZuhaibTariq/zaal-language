@@ -10,7 +10,7 @@ void print_usage(){
     printf("\nUsage: interpreter [file]\n");
 }
 
-long read_source_file(char* file, char* buffer)
+long read_source_file(char* file, char** buffer)
 {
     // open an existing file for reading
     FILE* fptr = fopen(file, "r");
@@ -26,13 +26,13 @@ long read_source_file(char* file, char* buffer)
     fseek(fptr, 0L, SEEK_SET);
 
     // grab sufficient memory for the buffer to hold the text
-    buffer = (char*)calloc(numbytes, sizeof(char)); //responsibility of the caller to free this memory
+    *buffer = (char*)calloc(numbytes, sizeof(char)); //responsibility of the caller to free this memory
     
     // memory error
-    if (buffer == NULL) exit(2);
+    if (*buffer == NULL) exit(2);
     
     // copy all the text into the buffer
-    fread(buffer, sizeof(char), numbytes, fptr);
+    fread(*buffer, sizeof(char), numbytes, fptr);
     fclose(fptr);
 
     //return a source object with buffer as data and size as its length
@@ -42,6 +42,9 @@ long read_source_file(char* file, char* buffer)
 
 int run_code(Source* source)
 {
+    //initialize source
+    source->current = 0;
+    source->line = 1;
     TokensList tokens;
     scan_tokens(source, &tokens); //alloc tokens.arr[0-size].value, tokens->arr
 
@@ -64,20 +67,18 @@ int run_interactive(){
     Source source;
     int status = 0;
     char* buffer;
+    size_t size=0;
     while (true) {
 
         //display a prompt
         printf("%s", "> ");
 
         //read a line from stdin and store its size
-        size_t size;
+
         source.size = getline(&buffer, &size, stdin);   // alloc-0 buffer
 
         //scanf returns NULL when Ctrl+D (EOF) is pressed
         if (source.size == -1) break;
-        
-        //initialize source
-        source.current = 0;
 
         // save char* to a const char* to avoid unwanted modification
         source.data = buffer;
@@ -98,7 +99,7 @@ int run_file(char* file_path)
     Source source;
     // read file contents from file passed as argument in argv[1] and return a source instance
     char* buffer;
-    source.size = read_source_file(file_path, buffer); // alloc-1 buffer
+    source.size = read_source_file(file_path, &buffer); // alloc-1 buffer
     
     // save char* to a const char* to avoid unwanted modification
     source.data = buffer;

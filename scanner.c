@@ -41,7 +41,12 @@ TokenType slash_token(Source* source, int start)
     else if (next_if(source, '/')){
         
         //since it's a comment, eat charaters till '\n' or '\0'
-        for(char ch = next(source); ch != '\n' && ch != '\0'; ch=next(source));
+        for(char ch = next(source); ch != '\0'; ch=next(source))
+            if (ch == '\n') {
+                source->line++;
+                break;
+            }
+
         return NO_TOK;
     }
     else return SLASH;
@@ -59,11 +64,9 @@ TokenType string_token(Source* source, int start, char tok)
     //since it's a string, eat charaters till a " or ' whatever is in tok
     for(char ch = next(source); ch != tok; ch=next(source)){
         if (ch == '\0' || ch == '\n'){
-            //Generate an Error "Unterminated String"
-            char* sub_str = slice(source->data, start, source->current); // alloc-3 sub_str
-            printf("%s[ERROR] Unterminated String at ^ line\n", sub_str);
-            free(sub_str); // free-3 sub_str
-            source->current = start + 1;
+            //Print an Error
+            log_line(source->data, start, source->current);
+            printf("[ERROR] Unterminated String at line %lu\n", source->line);
             return NO_TOK;
         }
     }
@@ -117,7 +120,9 @@ TokenType scan_next_token(Source* source)
     case ' ':
     case '\r':
     case '\t':
+            return NO_TOK;
     case '\n':
+            source->line++;
             return NO_TOK;
     //For 0-9 Character
     case 48 ... 57: return number_token(source, start);

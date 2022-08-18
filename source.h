@@ -5,8 +5,9 @@
 #define __SOURCE_H_INCLUDED__
 
 typedef struct source{
-    long size;
-    long current;
+    unsigned long size;
+    unsigned long current;
+    unsigned long line;
     const char* data;
 }Source;
 
