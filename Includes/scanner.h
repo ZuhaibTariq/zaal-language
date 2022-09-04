@@ -10,20 +10,20 @@
 
 #define MIN_LIST_VALUE 500
 
-char next(Source* source);
+char forward(Source* source, char _if);
 
-char look_next(Source* source);
+char current(Source* source);
 
-bool next_if(Source* source, char expected);
+int forward_if(Source* source, char expected);
 
-Token slash_token(Source* source, int start);
+Token comment(Source* source, int start);
 
-Token number_token(Source* source, int start);
+Token number(Source* source, int start);
 
-Token string_token(Source* source, int start, char tok);
+Token string(Source* source, int start, char tok);
 
 
-Token alphabet_token(Source* source, int start);
+Token word(Source* source, int start);
 
 TokenType scan_next_token(Source* source);
 

@@ -2,42 +2,25 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
-#include "scanner.h"
-#include "source.h"
+#include "Includes/scanner.h"
+#include "Includes/source.h"
+#include "Includes/utils.h"
 
 
 void print_usage(){
     printf("\nUsage: interpreter [file]\n");
 }
 
-long read_source_file(char* file, char** buffer)
+void free_tokens(TokensList* tokens)
 {
-    // open an existing file for reading
-    FILE* fptr = fopen(file, "r");
+    //Free each token's value
+    for(int i=0; tokens->arr[i].type != EOFI; i++)
+    {
+        free(tokens->arr[i].value); // free tokens.arr[0-size].value
+    }
 
-    // exit if the file does not exist
-    if(fptr == NULL) exit(1);
-
-    // Get the number of bytes
-    fseek(fptr, 0L, SEEK_END);
-    long numbytes = ftell(fptr);
-
-    // reset the file position indicator to the beginning of the file
-    fseek(fptr, 0L, SEEK_SET);
-
-    // grab sufficient memory for the buffer to hold the text
-    *buffer = (char*)calloc(numbytes, sizeof(char)); //responsibility of the caller to free this memory
-    
-    // memory error
-    if (*buffer == NULL) exit(2);
-    
-    // copy all the text into the buffer
-    fread(*buffer, sizeof(char), numbytes, fptr);
-    fclose(fptr);
-
-    //return a source object with buffer as data and size as its length
-    return numbytes;
-
+    //free all tokens
+    free(tokens->arr); // free-2 token->arr
 }
 
 int run_code(Source* source)
@@ -45,6 +28,8 @@ int run_code(Source* source)
     //initialize source
     source->current = 0;
     source->line = 1;
+
+    //Get Tokens
     TokensList tokens;
     scan_tokens(source, &tokens); //alloc tokens.arr[0-size].value, tokens->arr
 
@@ -52,11 +37,9 @@ int run_code(Source* source)
     for(int i=0; tokens.arr[i].type != EOFI; i++)
     {
         printf("\"%s\"\n", tokens.arr[i].value);
-        free(tokens.arr[i].value); // free tokens.arr[0-size].value
     }
 
-    // NOTE: Check whether all tokens.arr[0-size].value are freed
-    free(tokens.arr); // free-2 token->arr
+    free_tokens(&tokens); //free-2 tokens->arr,  tokens.arr[0-size].value, 
     // return status code
     return 0;
 }
@@ -97,7 +80,7 @@ int run_interactive(){
 int run_file(char* file_path)
 {
     Source source;
-    // read file contents from file passed as argument in argv[1] and return a source instance
+    // read file contents from file passed as argument in argv[1]
     char* buffer;
     source.size = read_source_file(file_path, &buffer); // alloc-1 buffer
     

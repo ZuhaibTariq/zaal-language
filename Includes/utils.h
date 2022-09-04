@@ -7,4 +7,6 @@ char* slice(const char *str, size_t start, size_t end);
 
 void log_line(const char* str, int start, int current);
 
+long read_source_file(char* file, char** buffer);
+
 #endif

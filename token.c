@@ -1,5 +1,5 @@
-#include "token.h"
-#include "utils.h"
+#include "Includes/token.h"
+#include "Includes/utils.h"
 
 char* resrv_kwrd[] = {
     [AND] = "and",
@@ -22,8 +22,13 @@ char* resrv_kwrd[] = {
 };
 
 Token new_token(TokenType type, const char* data, int start, int end)
+{   
+    //Remove Quotes from string before saving its value
+    if (type == STRING){
+        start++;
+        end--;
+    }
 
-{
     Token t;
     t.type = type;
     t.value = slice(data, start, end); // Responsiblity of the caller to free this memory
