@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "Includes/source.h"
+#include "Includes/scanner.h"
 #include "Includes/token.h"
 #include "Includes/utils.h"
 
@@ -26,7 +27,7 @@ int forward_if(Source* source, char expected)
     return source->current >= source->size ? false : source->data[source->current] == expected ? source->current++ : false;
 }
 
-TokenType comment(Source* source, int start)
+TokenType comment(Source* source)
 {
     //since it's a comment, eat charaters till '\n' or '\0'
     for(char ch = forward(source); ch != '\0'; ch=forward(source))
@@ -38,7 +39,7 @@ TokenType comment(Source* source, int start)
     return NO_TOK;
 }
 
-TokenType number(Source* source, int start)
+TokenType number(Source* source)
 {
     //Point source->current to last of the adjacent 0-9 characters
     for(char ch = current(source); ch >= '0' && ch <= '9'; ch=current(source)) source->current++;
@@ -48,7 +49,7 @@ TokenType number(Source* source, int start)
 
 TokenType string(Source* source, int start, char tok)
 {
-    //Eat charaters till a {tok} is encountered which can be " or ' 
+    //Point source->current to the ending tok (" or ')
     for(char ch = forward(source); ch != tok; ch=forward(source)){
         if (ch == '\0' || ch == '\n'){
             //Print an Error
@@ -90,7 +91,7 @@ TokenType scan_next_token(Source* source)
     case '.': return DOT;
     case ';': return SEMICOLON;
     case '%': return MODULO;
-    case '#': return comment(source, start);
+    case '#': return comment(source);
     //Double Characters Tokens
     case '!': return forward_if(source, '=') ? NOT_EQUAL : NOT;
     case '=': return forward_if(source, '=') ? EQUAL_EQUAL : EQUAL;
@@ -110,7 +111,7 @@ TokenType scan_next_token(Source* source)
             source->line++;
             return NO_TOK;
     //For 0-9 Character
-    case '0' ... '9': return number(source, start);
+    case '0' ... '9': return number(source);
     // For Alphabet and _ Character
     case 'a' ... 'z':
     case 'A' ... 'Z':
@@ -149,7 +150,7 @@ TokensList* scan_tokens(Source* source, TokensList* tokens){
     if (tokens->arr == NULL) {  printf("[ERROR] Mem Not Allocated for Tokens Array"); exit(2); }
     tokens->size = MIN_LIST_LENGTH;
     tokens->current = 0;
-    for (int tok_start = 0; tok_start < source->size; tok_start = source->current) {
+    for (unsigned long tok_start = 0; tok_start < source->size; tok_start = source->current) {
         // Getting next Token Type
         TokenType t_type = scan_next_token(source);
         if (t_type != NO_TOK && t_type != BAD_TOK)

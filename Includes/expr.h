@@ -1,8 +1,11 @@
+#ifndef __EXPR_H_INCLUDED__
+#define __EXPR_H_INCLUDED__
+
 #include "token.h"
 
 typedef struct _expr Expr;
 enum expr_kind{
-    BinaryExpr, UnaryExpr, VALUE, GROUP
+    BinaryExpr, UnaryExpr, LITERAL, GROUP
 };
 
 struct _expr{
@@ -21,10 +24,20 @@ struct _expr{
 
         struct{
             char* value;
-        }Value;
+        }Literal;
 
         struct{
             Expr* expr;
         }Group;
     };
 };
+
+Expr* createBinaryExpr(Expr* lhs, Token op, Expr* rhs);
+
+Expr* createUnaryExpr(Token op, Expr* rhs);
+
+Expr* createLiteralExpr(char* value);
+
+Expr* createGroupExpr(Expr* expr);
+
+#endif

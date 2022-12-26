@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+#include "Includes/parser.h"
 #include "Includes/scanner.h"
 #include "Includes/source.h"
 #include "Includes/utils.h"
@@ -38,6 +39,8 @@ int run_code(Source* source)
     {
         printf("\"%s\"\n", tokens.arr[i].value);
     }
+    
+    parseTokens(&tokens);
 
     free_tokens(&tokens); //free-2 tokens->arr,  tokens.arr[0-size].value, 
     // return status code
@@ -49,7 +52,7 @@ int run_interactive(){
     //create a source object with line and its size
     Source source;
     int status = 0;
-    char* buffer;
+    char* buffer = NULL;
     size_t size=0;
     while (true) {
 
